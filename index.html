@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bible Engine (by Kev)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #c60404;
+            --accent: #27ae60;
+            --bg: #081f44;
+            --border: #ddd;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { color: var(--primary); margin-bottom: 10px; }
+
+        /* --- CONTROLS --- */
+        .controls {
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            padding: 15px 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 15px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button:active { transform: translateY(1px); }
+
+        .btn-create { background-color: var(--primary); color: rgb(255, 255, 255); }
+        .btn-save { background-color: #8e44ad; color: white; }
+        .btn-import { background-color: #2980b9; color: white; }
+        .btn-txt { background-color: #e67e22; color: white; } /* Orange for TXT */
+        .btn-pdf { background-color: #c0392b; color: white; }
+
+        /* --- CONTAINERS --- */
+        #bible-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding-bottom: 100px;
+        }
+
+        .bible-wrapper {
+            border: 2px solid var(--primary);
+            background: #ffffff;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        /* --- ARROWS & ACTIONS --- */
+        .nav-arrows {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-right: 5px;
+        }
+        .arrow-btn {
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            font-size: 10px;
+            padding: 2px 5px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .arrow-btn:hover { background: #bdc3c7; }
+
+        /* --- BOOKS --- */
+        .book {
+            margin-left: 20px;
+            margin-top: 20px;
+            padding: 15px;
+            border-left: 5px solid #3498db;
+            background: #fdfdfd;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .book-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .book-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2980b9;
+            width: 50%;
+            border: none;
+            border-bottom: 1px dashed #ccc;
+        }
+
+        /* --- CHAPTERS --- */
+        .chapter {
+            margin-left: 20px;
+            margin-top: 15px;
+            padding: 10px;
+            border-left: 4px solid #e74c3c;
+            background: #fff;
+            margin-bottom: 10px;
+        }
+
+        .chapter-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .chapter-title { font-weight: bold; color: #c0392b; width: 150px; border:none; border-bottom: 1px dashed #e74c3c;}
+
+        /* --- VERSES & SUBHEADINGS --- */
+        .content-list { margin-left: 10px; display: flex; flex-direction: column; gap: 5px; }
+        
+        .verse-row, .subheading-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .verse-row:hover, .subheading-row:hover { background-color: #f8f9fa; }
+
+        .verse-num {
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 8px;
+            min-width: 25px;
+            text-align: right;
+        }
+
+        textarea.verse-text {
+            width: 100%;
+            resize: vertical;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: inherit;
+            min-height: 38px;
+        }
+
+        /* Subheading Style */
+        .subheading-row input {
+            width: 100%;
+            font-weight: bold;
+            font-style: italic;
+            text-align: center;
+            border: none;
+            border-bottom: 2px solid #aaa;
+            padding: 5px;
+            background: transparent;
+            font-size: 1.1em;
+        }
+
+        /* Action Buttons Row */
+        .row-actions {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .mini-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+        }
+        .btn-add-v { background-color: var(--accent); }
+        .btn-add-h { background-color: #f39c12; font-weight: bold; font-family: serif; }
+        .btn-del { background-color: transparent; color: #999; }
+        .btn-del:hover { color: red; }
+
+        /* Areas at the bottom of the book */
+        .add-chapter-area {
+            margin-top: 15px;
+            margin-left: 20px;
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .btn-add-chapter-big {
+            background-color: transparent;
+            border: 2px dashed #e74c3c;
+            color: #e74c3c;
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        .btn-add-chapter-big:hover { background-color: #fceceb; }
+
+        .btn-add-book-next {
+            background-color: transparent;
+            border: 2px dashed #3498db;
+            color: #3498db;
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        .btn-add-book-next:hover { background-color: #ebf5fb; }
+
+        .btn-min {
+            background: transparent;
+            border: 1px solid #ccc;
+            color: #555;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            min-width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-min:hover { background: #eee; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Bible Engine</h1>
+        <p>A better way to translate the Bible to future generations</p>
+    </header>
+
+    <div class="controls">
+        <button class="btn-create" onclick="addBibleUI()">+ New Bible</button>
+        <input type="file" id="file-input" style="display: none;" accept=".json" multiple onchange="importJSON(this)">
+        <button class="btn-import" onclick="document.getElementById('file-input').click()">📂 Import JSON</button>
+    </div>
+
+    <div id="bible-container"></div>
+
+    <div class="controls" style="position: static; border-bottom: none; border-top: 1px solid var(--border); margin-top: 20px;">
+        <button class="btn-create" onclick="addBibleUI()">+ New Bible</button>
+        <button class="btn-import" onclick="document.getElementById('file-input').click()">📂 Import JSON</button>
+    </div>
+
+    <script>
+        // --- 1. DOM ELEMENTS CREATION ---
+
+        function createArrows(onclickUp, onclickDown) {
+            const div = document.createElement('div');
+            div.className = 'nav-arrows';
+            div.innerHTML = `
+                <button class="arrow-btn" onclick="${onclickUp}">▲</button>
+                <button class="arrow-btn" onclick="${onclickDown}">▼</button>
+            `;
+            return div;
+        }
+
+        function createBibleDOM(title = "") {
+            const div = document.createElement('div');
+            div.className = 'bible-wrapper item';
+            
+            const header = document.createElement('div');
+            header.className = 'bible-header';
+            header.style.display = 'flex';
+            header.style.gap = '10px';
+
+            const content = document.createElement('div');
+            content.style.flexGrow = '1';
+            content.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="text" placeholder="Bible Name" class="bible-name" value="${title}" style="font-size:1.5em; font-weight:bold; flex-grow:1; border:none; border-bottom:2px solid #2c3e50;">
+                    <button class="btn-min" onclick="toggleSection(this)" title="Minimize">−</button>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:5px;">
+                    <button class="btn-save" onclick="exportToJSON(this)">💾 Save JSON</button>
+                    <button class="btn-txt" onclick="exportToTXT(this)">📄 Export TXT</button>
+                    <button class="btn-pdf" onclick="exportToPDF(this)">📄 Export PDF</button>
+                </div>
+                <div style="margin-top:10px; display:flex; justify-content:space-between;">
+                    <button class="btn-create" onclick="addBookUI(this)">+ Add Book (Top)</button>
+                    <button class="btn-del" onclick="this.closest('.bible-wrapper').remove()">Delete Bible</button>
+                </div>
+            `;
+            
+            const arrows = createArrows("moveItem(this, -1)", "moveItem(this, 1)");
+            header.appendChild(arrows);
+            header.appendChild(content);
+
+            const booksContainer = document.createElement('div');
+            booksContainer.className = 'books-container';
+
+            div.appendChild(header);
+            div.appendChild(booksContainer);
+            return div;
+        }
+
+        function createBookDOM(title = "") {
+            const div = document.createElement('div');
+            div.className = 'book item';
+            div.innerHTML = `
+                <div class="book-header">
+                    <div class="nav-arrows">
+                        <button class="arrow-btn" onclick="moveItem(this, -1)">▲</button>
+                        <button class="arrow-btn" onclick="moveItem(this, 1)">▼</button>
+                    </div>
+                    <span>📚</span>
+                    <input type="text" class="book-title" placeholder="Book Name" value="${title}">
+                    <button class="btn-min" onclick="toggleSection(this)" title="Minimize">−</button>
+                    <button class="btn-del" onclick="this.closest('.book').remove()">x</button>
+                </div>
+                <div class="chapters-container"></div>
+                
+                <div class="add-chapter-area">
+                    <button class="btn-add-chapter-big" onclick="addChapterUI(this)">+ Add New Chapter</button>
+                    <button class="btn-add-book-next" onclick="addNextBookUI(this)">+ Add New Book</button>
+                </div>
+            `;
+            return div;
+        }
+
+        function createChapterDOM(title = "Chapter 1") {
+            const div = document.createElement('div');
+            div.className = 'chapter item';
+            div.innerHTML = `
+                <div class="chapter-header">
+                    <div class="nav-arrows">
+                        <button class="arrow-btn" onclick="moveItem(this, -1)">▲</button>
+                        <button class="arrow-btn" onclick="moveItem(this, 1)">▼</button>
+                    </div>
+                    <input type="text" class="chapter-title" value="${title}">
+                    <button class="btn-min" onclick="toggleSection(this)" title="Minimize">−</button>
+                    <button class="btn-del" onclick="this.closest('.chapter').remove()">x</button>
+                </div>
+                <div class="content-list"></div>
+            `;
+            return div;
+        }
+
+        function createVerseDOM(text = "") {
+            const div = document.createElement('div');
+            div.className = 'verse-row item';
+            div.dataset.type = 'verse';
+            div.innerHTML = `
+                <div class="nav-arrows">
+                    <button class="arrow-btn" onclick="moveItem(this, -1)">▲</button>
+                    <button class="arrow-btn" onclick="moveItem(this, 1)">▼</button>
+                </div>
+                <span class="verse-num"></span>
+                <textarea class="verse-text" placeholder="Verse text...">${text}</textarea>
+                <div class="row-actions">
+                    <button class="mini-btn btn-add-v" onclick="addItemUI(this, 'verse')" title="Add Verse Below">+</button>
+                    <button class="mini-btn btn-add-h" onclick="addItemUI(this, 'header')" title="Add Subtopic Below">H</button>
+                    <button class="mini-btn btn-del" onclick="removeItem(this)">x</button>
+                </div>
+            `;
+            return div;
+        }
+
+        function createSubheadingDOM(text = "") {
+            const div = document.createElement('div');
+            div.className = 'subheading-row item';
+            div.dataset.type = 'header';
+            div.innerHTML = `
+                <div class="nav-arrows">
+                    <button class="arrow-btn" onclick="moveItem(this, -1)">▲</button>
+                    <button class="arrow-btn" onclick="moveItem(this, 1)">▼</button>
+                </div>
+                <div style="width:25px;"></div>
+                <input type="text" value="${text}" placeholder="Subtopic Title (e.g., The Parable...)">
+                <div class="row-actions">
+                    <button class="mini-btn btn-add-v" onclick="addItemUI(this, 'verse')" title="Add Verse Below">+</button>
+                    <button class="mini-btn btn-add-h" onclick="addItemUI(this, 'header')" title="Add Subtopic Below">H</button>
+                    <button class="mini-btn btn-del" onclick="removeItem(this)">x</button>
+                </div>
+            `;
+            return div;
+        }
+
+        // --- 2. LOGIC & MOVEMENT ---
+
+        function addBibleUI() {
+            document.getElementById('bible-container').appendChild(createBibleDOM());
+        }
+
+        function toggleSection(btn) {
+            const parent = btn.closest('.item');
+            
+            if (parent.classList.contains('bible-wrapper')) {
+                const cont = parent.querySelector('.books-container');
+                if(cont.style.display === 'none') {
+                    cont.style.display = 'block';
+                    btn.textContent = '−';
+                } else {
+                    cont.style.display = 'none';
+                    btn.textContent = '+';
+                }
+            } else if (parent.classList.contains('book')) {
+                const cont = parent.querySelector('.chapters-container');
+                const addArea = parent.querySelector('.add-chapter-area');
+                const isHidden = cont.style.display === 'none';
+                cont.style.display = isHidden ? 'block' : 'none';
+                addArea.style.display = isHidden ? 'flex' : 'none';
+                btn.textContent = isHidden ? '−' : '+';
+            } else if (parent.classList.contains('chapter')) {
+                const cont = parent.querySelector('.content-list');
+                const isHidden = cont.style.display === 'none';
+                cont.style.display = isHidden ? 'flex' : 'none';
+                btn.textContent = isHidden ? '−' : '+';
+            }
+        }
+
+        function addBookUI(btn) {
+            const container = btn.closest('.bible-wrapper').querySelector('.books-container');
+            container.appendChild(createBookDOM());
+        }
+
+        function addNextBookUI(btn) {
+            const currentBook = btn.closest('.book');
+            const container = currentBook.parentElement;
+            const newBook = createBookDOM();
+            
+            if (currentBook.nextSibling) {
+                container.insertBefore(newBook, currentBook.nextSibling);
+            } else {
+                container.appendChild(newBook);
+            }
+        }
+
+        function addChapterUI(btn) {
+            const container = btn.closest('.book').querySelector('.chapters-container');
+            const count = container.querySelectorAll('.chapter').length + 1;
+            const chap = createChapterDOM("Chapter " + count);
+            container.appendChild(chap);
+            
+            const list = chap.querySelector('.content-list');
+            list.appendChild(createVerseDOM());
+            renumberVerses(list);
+        }
+
+        function addItemUI(btn, type) {
+            const currentItem = btn.closest('.item');
+            const container = currentItem.parentElement;
+            
+            let newItem;
+            if (type === 'verse') newItem = createVerseDOM();
+            else newItem = createSubheadingDOM();
+
+            if (currentItem.nextSibling) {
+                container.insertBefore(newItem, currentItem.nextSibling);
+            } else {
+                container.appendChild(newItem);
+            }
+            renumberVerses(container);
+        }
+
+        function removeItem(btn) {
+            const item = btn.closest('.item');
+            const container = item.parentElement;
+            item.remove();
+            renumberVerses(container);
+        }
+
+        function moveItem(btn, direction) {
+            const current = btn.closest('.item');
+            const container = current.parentElement;
+            const sibling = direction === -1 ? current.previousElementSibling : current.nextElementSibling;
+            
+            if (!sibling) return;
+
+            // 1. Record positions before move
+            const currentRect = current.getBoundingClientRect();
+            const siblingRect = sibling.getBoundingClientRect();
+            
+            // 2. Perform DOM move
+            if (direction === -1) {
+                container.insertBefore(current, sibling);
+            } else {
+                container.insertBefore(sibling, current);
+            }
+            
+            if (current.classList.contains('verse-row') || current.classList.contains('subheading-row')) {
+                renumberVerses(container);
+            }
+
+            // 3. Animate (FLIP technique)
+            const newCurrentRect = current.getBoundingClientRect();
+            const newSiblingRect = sibling.getBoundingClientRect();
+
+            current.style.transition = 'none';
+            sibling.style.transition = 'none';
+            current.style.transform = `translateY(${currentRect.top - newCurrentRect.top}px)`;
+            sibling.style.transform = `translateY(${siblingRect.top - newSiblingRect.top}px)`;
+
+            void current.offsetHeight; // Force reflow
+
+            current.style.transition = 'transform 0.3s ease';
+            sibling.style.transition = 'transform 0.3s ease';
+            current.style.transform = '';
+            sibling.style.transform = '';
+
+            setTimeout(() => {
+                current.style.transition = '';
+                sibling.style.transition = '';
+            }, 300);
+        }
+
+        function renumberVerses(container) {
+            let count = 1;
+            const items = container.querySelectorAll('.item');
+            items.forEach(item => {
+                if (item.classList.contains('verse-row')) {
+                    item.querySelector('.verse-num').textContent = count + ".";
+                    count++;
+                }
+            });
+        }
+
+        // --- 3. DATA STRUCTURE (JSON) ---
+
+        function buildData(targetBible = null) {
+            const bibles = [];
+            const sources = targetBible ? [targetBible] : document.querySelectorAll('.bible-wrapper');
+            sources.forEach(bibleEl => {
+                const bible = {
+                    title: bibleEl.querySelector('.bible-name').value,
+                    books: []
+                };
+                bibleEl.querySelectorAll('.book').forEach(bookEl => {
+                    const book = {
+                        book: bookEl.querySelector('.book-title').value,
+                        chapters: []
+                    };
+                    let chapterCount = 1;
+                    bookEl.querySelectorAll('.chapter').forEach(chapEl => {
+                        const chapter = {
+                            chapter: chapterCount++,
+                            content: [] 
+                        };
+                        let verseCount = 1;
+                        chapEl.querySelectorAll('.content-list > .item').forEach(item => {
+                            if(item.dataset.type === 'verse') {
+                                chapter.content.push({
+                                    verse: verseCount++,
+                                    text: item.querySelector('.verse-text').value
+                                });
+                            } else {
+                                chapter.content.push({
+                                    header: item.querySelector('input').value
+                                });
+                            }
+                        });
+                        book.chapters.push(chapter);
+                    });
+                    bible.books.push(book);
+                });
+                bibles.push(bible);
+            });
+            return bibles;
+        }
+
+        // --- 4. EXPORT / IMPORT JSON ---
+
+        function exportToJSON(btn) {
+            const bibleEl = btn.closest('.bible-wrapper');
+            const data = buildData(bibleEl);
+            let jsonStr = JSON.stringify(data, null, 2);
+            jsonStr = jsonStr.replace(/},\n/g, "},\n\n");
+            const fileName = (data[0].title || 'bible') + '.json';
+            downloadFile(jsonStr, fileName, 'application/json');
+        }
+
+        function importJSON(input) {
+            if (!input.files || input.files.length === 0) return;
+            const files = Array.from(input.files);
+            const promises = files.map(file => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            if (!Array.isArray(data) || data.some(b => !b || typeof b !== 'object' || !Array.isArray(b.books))) {
+                                reject(new Error("Invalid structure"));
+                            } else {
+                                resolve(data);
+                            }
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.onerror = () => reject(new Error("Read error"));
+                    reader.readAsText(file);
+                });
+            });
+
+            Promise.all(promises).then(results => {
+                const combined = results.flat();
+                reconstruct(combined);
+            }).catch(err => {
+                alert("The file you've chosen, or the content inside the file in question, does not match with the expected structure of a project made with Bible Engine");
+            }).finally(() => {
+                input.value = '';
+            });
+        }
+
+        function reconstruct(data) {
+            const main = document.getElementById('bible-container');
+            if (main.children.length === 1) {
+                const current = main.children[0];
+                if (!current.querySelector('.bible-name').value && current.querySelector('.books-container').children.length === 0) {
+                    main.innerHTML = '';
+                }
+            }
+            data.forEach(b => {
+                const bibleEl = createBibleDOM(b.title);
+                const booksCont = bibleEl.querySelector('.books-container');
+                b.books.forEach(bk => {
+                    const bookEl = createBookDOM(bk.book || bk.title);
+                    const chapsCont = bookEl.querySelector('.chapters-container');
+                    bk.chapters.forEach(ch => {
+                        const chapTitle = ch.chapter ? "Chapter " + ch.chapter : ch.title;
+                        const chapEl = createChapterDOM(chapTitle);
+                        const list = chapEl.querySelector('.content-list');
+                        
+                        const contentArray = ch.content || ch.verses; 
+                        if(contentArray) {
+                            contentArray.forEach(item => {
+                                if (typeof item === 'string' || (item.type === undefined && item.text && !item.verse)) {
+                                    const txt = typeof item === 'string' ? item : item.text;
+                                    list.appendChild(createVerseDOM(txt));
+                                } else if (item.verse || item.type === 'verse') {
+                                    list.appendChild(createVerseDOM(item.text));
+                                } else if (item.header || item.type === 'header') {
+                                    list.appendChild(createSubheadingDOM(item.header || item.text));
+                                }
+                            });
+                        }
+                        renumberVerses(list);
+                        chapsCont.appendChild(chapEl);
+                    });
+                    booksCont.appendChild(bookEl);
+                });
+                main.appendChild(bibleEl);
+            });
+        }
+
+        // --- 5. EXPORT TXT FUNCTION ---
+        function exportToTXT(btn) {
+            const bibleEl = btn.closest('.bible-wrapper');
+            const data = buildData(bibleEl);
+            let txtContent = "";
+            
+            data.forEach(bible => {
+                txtContent += `=== ${bible.title.toUpperCase()} ===\n\n`;
+                bible.books.forEach(book => {
+                    txtContent += `BOOK: ${book.book}\n\n`;
+                    book.chapters.forEach(chap => {
+                        txtContent += `Chapter ${chap.chapter}\n\n`;
+                        
+                        chap.content.forEach((item, index) => {
+                            if(item.header !== undefined) {
+                                txtContent += `[ ${item.header} ]\n`;
+                                if (index < chap.content.length - 1) {
+                                    txtContent += `\n`;
+                                }
+                            } else {
+                                txtContent += `${item.verse}. ${item.text}\n`;
+                                const nextItem = chap.content[index + 1];
+                                if (nextItem && nextItem.header !== undefined) {
+                                    txtContent += `\n`;
+                                }
+                            }
+                        });
+                        txtContent += `\n`;
+                    });
+                    txtContent += "--------------------\n\n";
+                });
+            });
+            
+            const fileName = (data[0].title || 'bible') + '.txt';
+            downloadFile(txtContent, fileName, 'text/plain');
+        }
+
+        function downloadFile(content, fileName, contentType) {
+            const a = document.createElement("a");
+            const file = new Blob([content], {type: contentType});
+            a.href = URL.createObjectURL(file);
+            a.download = fileName;
+            a.click();
+        }
+
+        // --- 6. EXPORT PDF FUNCTION ---
+        async function exportToPDF(btn) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+
+            const pageHeight = 280; // User requested 28cm limit
+            const marginTop = 20;
+            const marginLeft = 15;
+            const marginRight = 15;
+            const marginBottom = 20;
+            const colGap = 10;
+            const colWidth = (210 - marginLeft - marginRight - colGap) / 2;
+            const midX = 105;
+            
+            let currentX = marginLeft;
+            let currentY = marginTop;
+            let currentCol = 0;
+
+            function drawSeparator() {
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.1);
+                doc.line(midX, marginTop, midX, pageHeight - marginBottom);
+            }
+
+            drawSeparator();
+
+            function checkPageBreak(heightNeeded) {
+                if (currentY + heightNeeded > pageHeight - marginBottom) {
+                    if (currentCol === 0) {
+                        currentCol = 1;
+                        currentX = marginLeft + colWidth + colGap;
+                        currentY = marginTop;
+                    } else {
+                        doc.addPage();
+                        drawSeparator();
+                        currentCol = 0;
+                        currentX = marginLeft;
+                        currentY = marginTop;
+                    }
+                }
+            }
+
+            function setFont(type) {
+                if (type === 'book') {
+                    doc.setFont("helvetica", "bold"); // Approx for Arial Black
+                    doc.setFontSize(15);
+                } else if (type === 'chapter') {
+                    doc.setFont("helvetica", "bold"); // Approx for Arial Black
+                    doc.setFontSize(12);
+                } else if (type === 'header') {
+                    doc.setFont("times", "bold"); // Approx for Algerian
+                    doc.setFontSize(15);
+                } else if (type === 'verse-num') {
+                    doc.setFont("helvetica", "normal"); // Arial
+                    doc.setFontSize(8);
+                } else if (type === 'verse-text') {
+                    doc.setFont("helvetica", "normal"); // Arial
+                    doc.setFontSize(12);
+                }
+            }
+
+            const bibleEl = btn.closest('.bible-wrapper');
+            const data = buildData(bibleEl);
+            const emptyLine = 6;
+
+            data.forEach(bible => {
+                bible.books.forEach(book => {
+                    setFont('book');
+                    const bookTitle = book.book.toUpperCase();
+                    const bookLines = doc.splitTextToSize(bookTitle, colWidth);
+                    checkPageBreak(bookLines.length * 7 + emptyLine);
+                    doc.text(bookLines, currentX, currentY + 5);
+                    currentY += (bookLines.length * 7) + 5;
+                    currentY += emptyLine;
+
+                    book.chapters.forEach(chap => {
+                        let firstItem = chap.content[0];
+                        let hasTopHeader = (firstItem && firstItem.header !== undefined);
+
+                        if (hasTopHeader) {
+                            setFont('header');
+                            const hLines = doc.splitTextToSize(firstItem.header, colWidth);
+                            checkPageBreak(hLines.length * 7 + emptyLine);
+                            doc.text(hLines, currentX, currentY + 5);
+                            currentY += (hLines.length * 7) + 5;
+                            currentY += emptyLine;
+                        }
+
+                        const chapNum = chap.chapter.toString();
+                        
+                        chap.content.forEach((item, idx) => {
+                            if (hasTopHeader && idx === 0) return;
+
+                            if (item.header !== undefined) {
+                                currentY += emptyLine;
+                                setFont('header');
+                                const hLines = doc.splitTextToSize(item.header, colWidth);
+                                checkPageBreak(hLines.length * 7 + emptyLine);
+                                doc.text(hLines, currentX, currentY + 5);
+                                currentY += (hLines.length * 7) + 5;
+                                currentY += emptyLine;
+                            } else {
+                                const isVerse1 = (item.verse === 1);
+                                const prefix = isVerse1 ? chapNum : item.verse.toString();
+                                const prefixFont = isVerse1 ? 'chapter' : 'verse-num';
+                                
+                                setFont(prefixFont);
+                                const prefixW = doc.getTextWidth(prefix);
+                                checkPageBreak(6);
+                                doc.text(prefix, currentX, currentY + 5);
+                                
+                                setFont('verse-text');
+                                const textLines = doc.splitTextToSize(item.text, colWidth - prefixW - 2);
+                                if (textLines.length > 0) doc.text(textLines[0], currentX + prefixW + 2, currentY + 5);
+                                
+                                for (let i = 1; i < textLines.length; i++) {
+                                    currentY += 5;
+                                    checkPageBreak(5);
+                                    doc.text(textLines[i], currentX, currentY + 5);
+                                }
+                                currentY += 7; 
+                            }
+                        });
+                        currentY += emptyLine;
+                    });
+                    // currentY += emptyLine;
+                });
+            });
+            const fileName = (data[0].title || 'bible') + '.pdf';
+            doc.save(fileName);
+        }
+
+        // --- 7. SHORTCUTS & PROTECTION ---
+
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                const data = buildData();
+                
+                if (data.length > 1) {
+                    data.forEach(bible => {
+                        let jsonStr = JSON.stringify([bible], null, 2);
+                        jsonStr = jsonStr.replace(/},\n/g, "},\n\n");
+                        const fileName = (bible.title ? bible.title : 'BibleEngine_Project') + '.json';
+                        downloadFile(jsonStr, fileName, 'application/json');
+                    });
+                } else {
+                    let jsonStr = JSON.stringify(data, null, 2);
+                    jsonStr = jsonStr.replace(/},\n/g, "},\n\n");
+                    const fileName = (data.length > 0 && data[0].title ? data[0].title : 'BibleEngine_Project') + '.json';
+                    downloadFile(jsonStr, fileName, 'application/json');
+                }
+            }
+        });
+
+        window.addEventListener('beforeunload', e => {
+            if (document.getElementById('bible-container').children.length > 0) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        if(document.getElementById('bible-container').children.length === 0) addBibleUI();
+
+    </script>
+</body>
+</html>
